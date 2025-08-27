@@ -49,6 +49,15 @@ echo ENDERECOS DE REDE (IPs): >> %logfile%
 echo ========================================================================= >> %logfile%
 wmic /node:"%computerName%" nicconfig get ipaddress,description | findstr /v "IPAddress" >> %logfile%
 
+REM =========================================================================
+REM PASSO 6: COLETA DA VERSAO DO OFFICE
+REM =========================================================================
+echo. >> %logfile%
+echo ========================================================================= >> %logfile%
+echo VERSAO DO MICROSOFT OFFICE: >> %logfile%
+echo ========================================================================= >> %logfile%
+wmic /node:"%computerName%" product where "name like 'Microsoft Office%%'" get name,version >> %logfile%
+
 echo.
 echo Coleta de dados finalizada!
 echo O relatorio foi salvo em: %logfile%
