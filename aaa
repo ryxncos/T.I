@@ -1,65 +1,94 @@
-@echo off
-title Coletor de Dados de PC Remoto
+# Solicita o nome do computador remoto.
+$ComputerName = Read-Host "Digite o nome ou IP do computador"
 
-REM =========================================================================
-REM SOLICITA O NOME DO COMPUTADOR
-REM =========================================================================
-set /p computerName=Digite o nome ou IP do computador: 
+# Define o caminho do arquivo de log.
+$LogPath = "$PSScriptRoot\Dados_$ComputerName-$(Get-Date -f yyyyMMdd-HHmmss).txt"
 
-echo.
-echo Verificando se o computador %computerName% esta online...
-echo.
+Write-Host "`nVerificando se o computador '$ComputerName' está online..." -ForegroundColor Yellow
 
-REM =========================================================================
-REM PASSO 1: PING PARA VERIFICAR CONEXAO
-REM =========================================================================
-ping -n 1 %computerName% | find "TTL" > nul
-
-if %errorlevel% neq 0 (
-    echo.
-    echo ERRO: Computador %computerName% esta offline ou inacessivel.
-    echo.
-    pause
+# --- Passo 1: Ping para verificar a conexão ---
+if (-not (Test-Connection -ComputerName $ComputerName -Count 1 -Quiet)) {
+    Write-Warning "ERRO: O computador '$ComputerName' está offline ou inacessível."
+    Read-Host "`nPressione Enter para sair..."
     exit
-)
+}
 
-echo Computador online. Prosseguindo com a coleta de dados...
-echo.
+Write-Host "Computador online. Coletando dados..." -ForegroundColor Green
 
-REM =========================================================================
-REM CONFIGURA O NOME DO ARQUIVO DE LOG
-REM =========================================================================
-set logfile=Dados_%computerName%_%date:~-4,4%%date:~-7,2%%date:~-10,2%_%time:~0,2%%time:~3,2%%time:~6,2%.txt
+# Inicia a gravação da transcrição para o arquivo de log.
+Start-Transcript -Path $LogPath -Append
 
-REM =========================================================================
-REM PASSO 2, 3, 4 e 5: COLETA DAS INFORMACOES
-REM Usa SYSTEMINFO para dados de SO, inicializacao e hardware.
-REM =========================================================================
-echo Coletando dados de sistema. Aguarde...
-echo ========================================================================= >> %logfile%
-echo Relatorio de dados do PC: %computerName% >> %logfile%
-echo Data do Relatorio: %date% %time% >> %logfile%
-echo ========================================================================= >> %logfile%
+Write-Output "==========================================================="
+Write-Output "RELATÓRIO DE DADOS DO COMPUTADOR: $ComputerName"
+Write-Output "Gerado em: $(Get-Date)"
+Write-Output "==========================================================="
+Write-Output ""
 
-systeminfo /s %computerName% | findstr /b /c:"Nome do sistema operacional:" /c:"Versao do SO:" /c:"Tempo de inicializacao do sistema:" /c:"Nome do processador(es):" /c:"Memoria fisica total:" /c:"Tipo de sistema:" >> %logfile%
+# --- Passo 2 e 3: Informações do SO e Última Inicialização ---
+Write-Output "--- Informações do Sistema Operacional ---"
+try {
+    $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $ComputerName
+    Write-Output "Nome do SO: $($OSInfo.Caption)"
+    Write-Output "Versão do SO: $($OSInfo.Version)"
+    Write-Output "Última Inicialização: $($OSInfo.LastBootUpTime.ToLocalTime())"
+    Write-Output ""
+}
+catch {
+    Write-Output "Não foi possível obter informações do SO."
+}
 
-echo. >> %logfile%
-echo ========================================================================= >> %logfile%
-echo ENDERECOS DE REDE (IPs): >> %logfile%
-echo ========================================================================= >> %logfile%
-wmic /node:"%computerName%" nicconfig get ipaddress,description | findstr /v "IPAddress" >> %logfile%
+# --- Passo 4: Endereços de Rede (IP) ---
+Write-Output "--- Endereços de Rede (IP) ---"
+try {
+    $IPInfo = Get-NetIPAddress -ComputerName $ComputerName -AddressFamily IPv4 | Where-Object {($_.PrefixOrigin -eq 'Dhcp' -or $_.PrefixOrigin -eq 'Manual')}
+    $IPInfo | Format-Table -AutoSize
+    Write-Output ""
+}
+catch {
+    Write-Output "Não foi possível obter endereços de IP."
+}
 
-REM =========================================================================
-REM PASSO 6: COLETA DA VERSAO DO OFFICE
-REM =========================================================================
-echo. >> %logfile%
-echo ========================================================================= >> %logfile%
-echo VERSAO DO MICROSOFT OFFICE: >> %logfile%
-echo ========================================================================= >> %logfile%
-wmic /node:"%computerName%" product where "name like 'Microsoft Office%%'" get name,version >> %logfile%
+# --- Passo 5: Informações de Hardware (CPU, RAM) ---
+Write-Output "--- Informações de Hardware ---"
+try {
+    $CPUInfo = Get-CimInstance -ClassName Win32_Processor -ComputerName $ComputerName
+    Write-Output "Processador: $($CPUInfo.Name) (Cores: $($CPUInfo.NumberOfCores), Lógicos: $($CPUInfo.NumberOfLogicalProcessors))"
+    $RAMInfo = Get-CimInstance -ClassName Win32_ComputerSystem -ComputerName $ComputerName
+    Write-Output "Memória RAM: $($RAMInfo.TotalPhysicalMemory / 1GB -as [int]) GB"
+    $DiskInfo = Get-CimInstance -ClassName Win32_DiskDrive -ComputerName $ComputerName
+    Write-Output "Discos (SSD/HDD):"
+    $DiskInfo | Format-Table -Property Model, @{Name='Tamanho GB'; Expression={$_.Size / 1GB -as [int]}}, MediaType -AutoSize
+    Write-Output ""
+}
+catch {
+    Write-Output "Não foi possível obter informações de hardware."
+}
 
-echo.
-echo Coleta de dados finalizada!
-echo O relatorio foi salvo em: %logfile%
-pause
-exit
+# --- Passo 6: Versão do Office ---
+Write-Output "--- Versão do Microsoft Office Instalada ---"
+try {
+    # NOTA: O uso de Win32_Product é lento e não é a melhor prática, mas é o método mais compatível
+    # e direto para replicar a funcionalidade do WMIC/CMD.
+    $OfficeInfo = Get-CimInstance -ClassName Win32_Product -ComputerName $ComputerName | Where-Object {$_.Name -like 'Microsoft Office*'} | Select-Object Name, Version
+    if ($OfficeInfo) {
+        $OfficeInfo | Format-Table -AutoSize
+    }
+    else {
+        Write-Output "Nenhuma versão do Office encontrada."
+    }
+}
+catch {
+    Write-Output "Não foi possível obter informações do Office."
+}
+
+Write-Output ""
+Write-Output "==========================================================="
+Write-Output "Coleta de dados finalizada."
+Write-Output "O relatório foi salvo em: $LogPath"
+Write-Output "==========================================================="
+
+# Para o arquivo de log.
+Stop-Transcript
+
+Write-Host "`nPressione Enter para sair..."
+Read-Host
