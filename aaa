@@ -1,0 +1,56 @@
+@echo off
+title Coletor de Dados de PC Remoto
+
+REM =========================================================================
+REM SOLICITA O NOME DO COMPUTADOR
+REM =========================================================================
+set /p computerName=Digite o nome ou IP do computador: 
+
+echo.
+echo Verificando se o computador %computerName% esta online...
+echo.
+
+REM =========================================================================
+REM PASSO 1: PING PARA VERIFICAR CONEXAO
+REM =========================================================================
+ping -n 1 %computerName% | find "TTL" > nul
+
+if %errorlevel% neq 0 (
+    echo.
+    echo ERRO: Computador %computerName% esta offline ou inacessivel.
+    echo.
+    pause
+    exit
+)
+
+echo Computador online. Prosseguindo com a coleta de dados...
+echo.
+
+REM =========================================================================
+REM CONFIGURA O NOME DO ARQUIVO DE LOG
+REM =========================================================================
+set logfile=Dados_%computerName%_%date:~-4,4%%date:~-7,2%%date:~-10,2%_%time:~0,2%%time:~3,2%%time:~6,2%.txt
+
+REM =========================================================================
+REM PASSO 2, 3, 4 e 5: COLETA DAS INFORMACOES
+REM Usa SYSTEMINFO para dados de SO, inicializacao e hardware.
+REM =========================================================================
+echo Coletando dados de sistema. Aguarde...
+echo ========================================================================= >> %logfile%
+echo Relatorio de dados do PC: %computerName% >> %logfile%
+echo Data do Relatorio: %date% %time% >> %logfile%
+echo ========================================================================= >> %logfile%
+
+systeminfo /s %computerName% | findstr /b /c:"Nome do sistema operacional:" /c:"Versao do SO:" /c:"Tempo de inicializacao do sistema:" /c:"Nome do processador(es):" /c:"Memoria fisica total:" /c:"Tipo de sistema:" >> %logfile%
+
+echo. >> %logfile%
+echo ========================================================================= >> %logfile%
+echo ENDERECOS DE REDE (IPs): >> %logfile%
+echo ========================================================================= >> %logfile%
+wmic /node:"%computerName%" nicconfig get ipaddress,description | findstr /v "IPAddress" >> %logfile%
+
+echo.
+echo Coleta de dados finalizada!
+echo O relatorio foi salvo em: %logfile%
+pause
+exit
