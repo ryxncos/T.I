@@ -1,0 +1,46 @@
+# Solicita o nome do computador
+$ComputerName = Read-Host "Digite o nome do computador"
+
+Write-Host "`n--- Informações do Computador $ComputerName ---"
+
+# Tenta pingar o computador para verificar se está online
+$PingResult = Test-Connection -ComputerName $ComputerName -Count 1 -Quiet
+if ($PingResult) {
+    Write-Host "Status: Online"
+    
+    # Obtém informações do sistema operacional
+    try {
+        $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $ComputerName | Select-Object Caption, OSArchitecture, @{Name="LastBootUpTime"; Expression={$_.LastBootUpTime.ToLocalTime()}}
+        Write-Host "Sistema Operacional: $($OSInfo.Caption) ($($OSInfo.OSArchitecture))"
+        Write-Host "Última Inicialização: $($OSInfo.LastBootUpTime)"
+    }
+    catch {
+        Write-Warning "Não foi possível obter informações do Sistema Operacional: $($_.Exception.Message)"
+    }
+
+    # Obtém informações de rede (IP)
+    try {
+        $NetInfo = Get-NetIPAddress -ComputerName $ComputerName -AddressFamily IPv4 | Where-Object {$_.PrefixOrigin -eq 'Dhcp' -or $_.PrefixOrigin -eq 'Manual'} | Select-Object IPAddress, InterfaceAlias, PrefixLength
+        Write-Host "Endereços IP:"
+        $NetInfo | Format-Table -AutoSize
+    }
+    catch {
+        Write-Warning "Não foi possível obter informações de IP: $($_.Exception.Message)"
+    }
+
+    # Obtém informações do hardware (CPU, RAM)
+    try {
+        $CPU = Get-CimInstance -ClassName Win32_Processor -ComputerName $ComputerName | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors
+        $RAM = Get-CimInstance -ClassName Win32_ComputerSystem -ComputerName $ComputerName | Select-Object @{Name="TotalPhysicalMemoryGB"; Expression={"{0:N2} GB" -f ($_.TotalPhysicalMemory / 1GB)}}
+        Write-Host "Processador: $($CPU.Name) (Cores: $($CPU.NumberOfCores), Lógicos: $($CPU.NumberOfLogicalProcessors))"
+        Write-Host "Memória RAM: $($RAM.TotalPhysicalMemoryGB)"
+    }
+    catch {
+        Write-Warning "Não foi possível obter informações de Hardware: $($_.Exception.Message)"
+    }
+
+} else {
+    Write-Warning "Computador $ComputerName está Offline ou inacessível."
+}
+
+Write-Host "--- Fim das Informações ---"
