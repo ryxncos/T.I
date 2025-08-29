@@ -1,0 +1,37 @@
+variável = área da memória do computador onde é armazenado um valor;
+Ex: int a = 1;
+imaginemos que a memória tem 1000 posições;
+a variável "a" é armazenada na posição 1000;
+e dentro dessa posição, ov  valor 1 é atribuído;
+
+ponteiro = é uma área da memória do computador onde é armazenado um valor, que armazena o endereço da 
+memória onde está outra variável;
+       
+ponteiros = 
+
+		Lista1_ED_ADS
+		
+1 - forma correta de declarar um ponteiro: 
+ int *ptr; 
+-> int sendo o tipo de valor;
+-> * indica que uma variável irá armazenar o endereço de de outra variável OU informa ao computador
+que você deseja o valor/conteudo que está no endereço armazenado;
+
+2. Qual é a maneira correta de referenciar o conteúdo de ch, assumindo que o endereço de ch foi
+atribuído ao ponteiro indica?
+(b)*indica;
+code ex:
+int main(int argc, char *argv[]) {
+	int ch = 1;
+	int *indica;
+	indica = &ch;
+	printf("%d", *indica);
+	
+	return 0;
+}
+
+3. Na expressão float *fptr, o que é do tipo float?
+(a) A variável fptr
+(b) O endereço de fptr
+(c) A variável apontada por ftpr
+(d) Nenhuma das anteriores
